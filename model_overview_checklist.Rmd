@@ -180,7 +180,7 @@ Actual data values for I `in_bed` are dots, mean estimates of I condition with 9
 
 ### Prior predictive check
 
-The prior predictive check estimates the model parameters without data or likelihood being used. The resulting draws are then used to predict new data via predictive application of the likelihood without having seen any data. Note that `compute_likelihood = 0` prevents the likelihood being computed in the model. 
+The prior predictive check estimates the model parameters without data being used. The resulting draws are then used to provide a human interpretable application of parameter values that reflect modeling goals. In this case we predict new data via predictive application of the likelihood without having seen any data. Note that `compute_likelihood = 0` prevents the likelihood combining data information with the priors. 
 
 ```{r echo=TRUE, comment=NA}
 compute_likelihood = 0 # will not compute likelihood, allows for prior predictive check
