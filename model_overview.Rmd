@@ -1,7 +1,7 @@
 ---
-title: "Model overview checklist"
+title: "Model reproduction checklist"
 author: "Breck Baldwin"
-date: "12/24/2020"
+date: "2/24/2020"
 output: html_document
 ---
 <!--Easiest way to render as html is open this file in RStudio and select 'Knit' option at top of window with this content.-->
@@ -12,6 +12,9 @@ This document exists in the repository at [https://github.com/codatmo/Simple_SIR
 
 ### Validation checklist items completed
 
+* Model description: Research goals, references, supplementary description as necessary.
+* Data description and explicit data munging description.
+* Small data set to validate model execution
 * Divergent transitions report
 * Rhat check
 * Compare marginal posterior densities across chains
