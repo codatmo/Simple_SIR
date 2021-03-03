@@ -2,7 +2,10 @@
 title: "Model reproduction checklist"
 author: "Breck Baldwin"
 date: "2/24/2020"
-output: html_document
+output: 
+  html_document:
+    includes:
+       in_header: _html/ga.html
 ---
 <!--Easiest way to render as html is open this file in RStudio and select 'Knit' option at top of window with this content.-->
 
@@ -33,8 +36,9 @@ Based on case study at [https://mc-stan.org/users/documentation/case-studies/boa
 ## Data 
 
 The data are freely available in the R package outbreaks, maintained as part of the [R Epidemics Consortium](http://www.repidemicsconsortium.org). 
+
 ```{r echo=TRUE, message=FALSE, comment=NA}
-library(rstan)
+library(cmdstanr)
 library(outbreaks)
 library(tidyverse)
 library(stringr)
@@ -105,14 +109,11 @@ get_data_block <- function(lines) {
 ## Running model
 
 ```{r echo=TRUE, message=FALSE, comment=NA}
-niter <- 2000
-model <- stan_model("stan/sir_negbin.stan")
-fit_sir_negbin <- sampling(model,
-                data = data_sir,
-                iter = niter,
-                chains = 4)
-pars=c('beta', 'gamma', "R0", "recovery_time")
-print(fit_sir_negbin, pars = pars)
+model <- cmdstan_model(file.path("stan","sir_negbin.stan"))
+fit_sir_negbin <- model$sample(
+                data = data_sir)
+
+fit_sir_negbin$cmdstan_summary()
 ```
 ## Model validation
 
@@ -123,14 +124,16 @@ Below are the diagnostics used to help validate the model.
 Rhat values are below 1.1, see below:
 
 ```{r echo==TRUE, comment=NA}
-stan_rhat(fit_sir_negbin)
+library(rstan)
+r_stan_sir_negbin <- rstan::read_stan_csv(fit_sir_negbin$output_files())
+stan_rhat(r_stan_sir_negbin)
 ```
 
 
 ### Divergent transition check
 
 ```{r comment=NA}
-stan_diag(fit_sir_negbin,information="divergence")
+stan_diag(r_stan_sir_negbin,information="divergence")
 ```
 
 
@@ -139,10 +142,11 @@ stan_diag(fit_sir_negbin,information="divergence")
 These graphs show that posteriors are similar across all 4 chains.
 
 ```{r echo=TRUE}
-stan_dens(fit_sir_negbin, pars = pars, separate_chains = TRUE)
+pars=c('beta', 'gamma', "R0", "recovery_time")
+stan_dens(r_stan_sir_negbin, pars = pars, separate_chains = TRUE)
 
 ```
-### Posterior predictive check
+<!--### Posterior predictive check
 
 Predict new data based on estimates--prediction is done in the `generated quantities` block of the Stan program--repeated below. 
 
@@ -168,16 +172,23 @@ cat(paste(get_generated_quantities_block(lines), "\n", sep=""), sep="")
 For each draw of parameter values the `generated quantities` block is executed and the variables `R0`, `recovery_time` and `pred_cases` are computed and stored with the corresponding parameter values. Examining these values can increase our confidence that the model and fit are reasonable. 
 ```{r}
 
-fit.df <- as.data.frame(summary(
-  fit_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary)
-smr_pred <- cbind(fit.df, ts, cases)
-colnames(smr_pred) <- make.names(colnames(smr_pred)) # to remove % in the col names
-
-ggplot(smr_pred, mapping = aes(x = ts)) +
-  geom_ribbon(aes(ymin = X5., ymax = X95.), fill = "orange", alpha = 0.6) +
-  geom_line(mapping = aes(x = ts, y = X50.)) + 
-  geom_point(mapping = aes(y = cases)) +
-  labs(x = "Day", y = "Number of students in bed")
+# smr_pred <- cbind(as.data.frame(summary(
+#   fit_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary), t, cases)
+# 
+# colnames(smr_pred) <- make.names(colnames(smr_pred))
+# 
+# 
+# 
+# fit.df <- as.data.frame(summary(
+#   fit_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary)
+# smr_pred <- cbind(fit.df, ts, cases)
+# colnames(smr_pred) <- make.names(colnames(smr_pred)) # to remove % in the col names
+# 
+# ggplot(smr_pred, mapping = aes(x = ts)) +
+#   geom_ribbon(aes(ymin = X5., ymax = X95.), fill = "orange", alpha = 0.6) +
+#   geom_line(mapping = aes(x = ts, y = X50.)) + 
+#   geom_point(mapping = aes(y = cases)) +
+#   labs(x = "Day", y = "Number of students in bed")
 ```
 Actual data values for I `in_bed` are dots, mean estimates of I condition with 95% confidence interval shaded. 
 
@@ -229,4 +240,5 @@ All the parameters fit within the 2.5% to to 97.5% interval.
 
 ### SBC validation
 
-To be done. 
+-->
+
