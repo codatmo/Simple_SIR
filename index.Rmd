@@ -11,7 +11,7 @@ output:
 
 # Model overview
 
-This document exists in the repository at [https://github.com/codatmo/Simple_SIR](https://github.com/codatmo/Simple_SIR) as `model_overview.Rmd` and rendered in html as `model_overview.html`.
+This document exists in the repository at [https://github.com/codatmo/Simple_SIR](https://github.com/codatmo/Simple_SIR) as `index.Rmd` and rendered in html as `index.html`.
 
 ### Validation checklist items completed
 
@@ -146,7 +146,7 @@ pars=c('beta', 'gamma', "R0", "recovery_time")
 stan_dens(r_stan_sir_negbin, pars = pars, separate_chains = TRUE)
 
 ```
-<!--### Posterior predictive check
+### Posterior predictive check
 
 Predict new data based on estimates--prediction is done in the `generated quantities` block of the Stan program--repeated below. 
 
@@ -172,23 +172,23 @@ cat(paste(get_generated_quantities_block(lines), "\n", sep=""), sep="")
 For each draw of parameter values the `generated quantities` block is executed and the variables `R0`, `recovery_time` and `pred_cases` are computed and stored with the corresponding parameter values. Examining these values can increase our confidence that the model and fit are reasonable. 
 ```{r}
 
-# smr_pred <- cbind(as.data.frame(summary(
-#   fit_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary), t, cases)
-# 
-# colnames(smr_pred) <- make.names(colnames(smr_pred))
-# 
-# 
-# 
-# fit.df <- as.data.frame(summary(
-#   fit_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary)
-# smr_pred <- cbind(fit.df, ts, cases)
-# colnames(smr_pred) <- make.names(colnames(smr_pred)) # to remove % in the col names
-# 
-# ggplot(smr_pred, mapping = aes(x = ts)) +
-#   geom_ribbon(aes(ymin = X5., ymax = X95.), fill = "orange", alpha = 0.6) +
-#   geom_line(mapping = aes(x = ts, y = X50.)) + 
-#   geom_point(mapping = aes(y = cases)) +
-#   labs(x = "Day", y = "Number of students in bed")
+smr_pred <- cbind(as.data.frame(summary(
+  r_stan_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary), ts, cases)
+
+colnames(smr_pred) <- make.names(colnames(smr_pred))
+
+
+
+fit.df <- as.data.frame(summary(
+  r_stan_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary)
+smr_pred <- cbind(fit.df, ts, cases)
+colnames(smr_pred) <- make.names(colnames(smr_pred)) # to remove % in the col names
+
+ggplot(smr_pred, mapping = aes(x = ts)) +
+  geom_ribbon(aes(ymin = X5., ymax = X95.), fill = "orange", alpha = 0.6) +
+  geom_line(mapping = aes(x = ts, y = X50.)) +
+  geom_point(mapping = aes(y = cases)) +
+  labs(x = "Day", y = "Number of students in bed")
 ```
 Actual data values for I `in_bed` are dots, mean estimates of I condition with 95% confidence interval shaded. 
 
@@ -197,19 +197,30 @@ Actual data values for I `in_bed` are dots, mean estimates of I condition with 9
 The prior predictive check estimates the model parameters without data or likelihood being used. The resulting draws are then used to predict new data via predictive application of the likelihood without having seen any data. Note that `compute_likelihood = 0` prevents the likelihood being computed in the model. 
 
 ```{r echo=TRUE, comment=NA}
-compute_likelihood = 0 # will not compute likelihood, allows for prior predictive check
+library(rstan)
+compute_likelihood = 1 # will not compute likelihood, allows for prior predictive check
 # data for Stan
-data_sir <- list(n_days = n_days, y0 = y0, t0 = t0, ts = ts, N = N, cases = cases, compute_likelihood = compute_likelihood)
+data_sir2 <- list(n_days = n_days, y0 = y0, t0 = t0, ts = ts, N = N, cases = cases, compute_likelihood = compute_likelihood)
 
-model <- stan_model("stan/sir_negbin.stan")
-fit_sir_negbin_prior_pred_chck <- sampling(model,
+data_sir <- list(n_days = n_days, i0 = i0, y0 = y0, s0 = s0, r0 = r0, t0 = t0, ts = ts, 
+                 N = N, cases = cases, compute_likelihood = compute_likelihood)
+niter <- 2000
+model <- cmdstan_model(file.path("stan","sir_negbin.stan"))
+
+fit_sir_negbin_ppc <- model$sample(
                 data = data_sir,
-                iter = niter,
-                chains = 4,
-                seed=1590291619) #this seed works, not all will
+                seed=1590291619)
+
+r_stan_sir_negbin_ppc <- rstan::read_stan_csv(fit_sir_negbin$output_files())
+# fit_sir_negbin_prior_pred_chck <- model$sample(
+#                 data = data_sir,
+#                 #iter = niter,
+#                 #chains = 4,
+#                 seed=1590291619
+#                 ) #this seed works, not all will
 
 pars=c('beta', 'gamma', "R0", "recovery_time")
-print(fit_sir_negbin_prior_pred_chck, pars = pars)
+print(r_stan_sir_negbin_ppc, pars = pars)
 
 ```
 The above summary shows values for our predicted quantities in the context of the parameters with intervals. The 95% interval of possible `recovery_time` spans reasonable values of .71 to 39.3 days as well as `R0` spanning values of 0.56 to 71.3. 
@@ -218,15 +229,20 @@ The above summary shows values for our predicted quantities in the context of th
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE, comment=NA}
 #Pick one arbitrary draw from the prior distribution
+library(rstan)
 draw <- 12 
 
-s_prior <- rstan::extract(fit_sir_negbin_prior_pred_chck)
+s_prior <- rstan::extract(r_stan_sir_negbin_ppc)
 cases_simu <- s_prior$pred_cases[draw,] 
 
 compute_likelihood = 1
 data_simu <-  list (n_days  = n_days, y0 = y0, t0 = t0, ts = ts, N=N, cases=cases_simu, compute_likelihood = compute_likelihood)
-fit_simu <- sampling(model, data=data_simu, chains=4, seed=1316072718)
+fit_simulated <- model$sample(
+                data = data_simu,
+                seed=1316072718)
 
+fit_simu <- sampling(model, data=data_simu, chains=4, seed=1316072718)
+fit_simu <- rstan::read_stan_csv(fit_simulated$output_files())
 params = c("beta", "gamma", "phi")
 paste("true beta :", toString(s_prior$beta[draw]), 
       ", true gamma :", toString(s_prior$gamma[draw]), ", true phi :", toString(s_prior$phi[draw]))
